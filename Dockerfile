@@ -32,11 +32,11 @@ WORKDIR /app
 # Upgrade pip
 RUN pip install --no-cache-dir --upgrade pip
 
-# Install PyTorch with CUDA 12.1 support
+# Install PyTorch with CUDA 12.1 support (using older version for TTS compatibility)
 RUN pip install --no-cache-dir \
-    torch==2.5.1+cu121 \
-    torchaudio==2.5.1+cu121 \
-    torchvision==0.20.1 \
+    torch==2.1.2+cu121 \
+    torchaudio==2.1.2+cu121 \
+    torchvision==0.16.2 \
     --index-url https://download.pytorch.org/whl/cu121
 
 # Install DeepSpeed

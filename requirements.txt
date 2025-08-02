@@ -12,3 +12,9 @@ python-dotenv
 # llm providers
 ollama
 openai
+
+# MMS-TTS dependencies
+transformers>=4.33.0
+torch
+scipy
+accelerate

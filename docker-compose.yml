@@ -6,7 +6,7 @@ services:
     image: realtime-voice-chat:latest # Name the image built by 'build:'
     container_name: realtime-voice-chat-app
     ports:
-      - "8000:8000"
+      - "8003:8000"
     environment:
       # Point to the 'ollama' service
       - OLLAMA_BASE_URL=http://ollama:11434
@@ -18,8 +18,8 @@ services:
       - HF_HOME=/home/appuser/.cache/huggingface
       - TORCH_HOME=/home/appuser/.cache/torch
     volumes:
-       # Optional: Mount code for live development
-       # - ./code:/app/code
+       # Mount code for live development (enabled to apply code changes without rebuild)
+       - ./code:/app/code
        # Mount cache directories
        - huggingface_cache:/home/appuser/.cache/huggingface
        - torch_cache:/home/appuser/.cache/torch

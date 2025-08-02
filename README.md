@@ -220,8 +220,9 @@ Want to tweak the AI's voice, brain, or how it listens? Modify the Python files 
 **⚠️ Important Docker Note:** If using Docker, make any configuration changes *before* running `docker compose build` to ensure they are included in the image.
 
 *   **TTS Engine & Voice (`server.py`, `audio_module.py`):**
-    *   Change `START_ENGINE` in `server.py` to `"coqui"`, `"kokoro"`, or `"orpheus"`.
+    *   Change `START_ENGINE` in `server.py` to `"coqui"`, `"kokoro"`, `"orpheus"`, or `"mms"`.
     *   Adjust engine-specific settings (e.g., voice model path for Coqui, speaker ID for Orpheus, speed) within `AudioProcessor.__init__` in `audio_module.py`.
+    *   **MMS-TTS Indonesian:** Uses Facebook's MMS-TTS Indonesian model for high-quality Indonesian speech synthesis.
 *   **LLM Backend & Model (`server.py`, `llm_module.py`):**
     *   Set `LLM_START_PROVIDER` (`"ollama"` or `"openai"`) and `LLM_START_MODEL` (e.g., `"hf.co/..."` for Ollama, model name for OpenAI) in `server.py`. Remember to pull the Ollama model if using Docker (see Installation Step A3).
     *   Customize the AI's personality by editing `system_prompt.txt`.

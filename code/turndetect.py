@@ -230,7 +230,7 @@ class TurnDetection:
         # Warmup the classification model for faster initial predictions
         logger.info("🎤🔥 Warming up the classification model...")
         with torch.no_grad():
-            warmup_text = "This is a warmup sentence."
+            warmup_text = "Ini adalah kalimat pemanasan."
             inputs = self.tokenizer(
                 warmup_text,
                 return_tensors="pt",

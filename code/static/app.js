@@ -130,7 +130,7 @@ async function startRawPcmCapture() {
     source.connect(micWorkletNode);
     statusDiv.textContent = "Recording...";
   } catch (err) {
-    statusDiv.textContent = "Mic access denied.";
+    statusDiv.textContent = "Akses mikrofon ditolak.";
     console.error(err);
   }
 }
@@ -289,21 +289,21 @@ speedSlider.addEventListener("input", (e) => {
       speed: speedValue
     }));
   }
-  console.log("Speed setting changed to:", speedValue);
+  console.log("Pengaturan kecepatan diubah ke:", speedValue);
 });
 
 document.getElementById("startBtn").onclick = async () => {
   if (socket && socket.readyState === WebSocket.OPEN) {
-    statusDiv.textContent = "Already recording.";
+    statusDiv.textContent = "Sedang merekam.";
     return;
   }
-  statusDiv.textContent = "Initializing connection...";
+  statusDiv.textContent = "Menginisialisasi koneksi...";
 
   const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   socket = new WebSocket(`${wsProto}//${location.host}/ws`);
 
   socket.onopen = async () => {
-    statusDiv.textContent = "Connected. Activating mic and TTS…";
+    statusDiv.textContent = "Terhubung. Mengaktifkan mikrofon dan TTS…";
     await startRawPcmCapture();
     await setupTTSPlayback();
     speedSlider.disabled = false; 
@@ -321,14 +321,14 @@ document.getElementById("startBtn").onclick = async () => {
   };
 
   socket.onclose = () => {
-    statusDiv.textContent = "Connection closed.";
+    statusDiv.textContent = "Koneksi terputus.";
     flushRemainder();
     cleanupAudio();
     speedSlider.disabled = true;
   };
 
   socket.onerror = (err) => {
-    statusDiv.textContent = "Connection error.";
+    statusDiv.textContent = "Kesalahan koneksi.";
     cleanupAudio();
     console.error(err);
     speedSlider.disabled = true; 
@@ -341,7 +341,7 @@ document.getElementById("stopBtn").onclick = () => {
     socket.close();
   }
   cleanupAudio();
-  statusDiv.textContent = "Stopped.";
+  statusDiv.textContent = "Dihentikan.";
 };
 
 document.getElementById("copyBtn").onclick = () => {
@@ -350,8 +350,8 @@ document.getElementById("copyBtn").onclick = () => {
     .join('\n');
   
   navigator.clipboard.writeText(text)
-    .then(() => console.log("Conversation copied to clipboard"))
-    .catch(err => console.error("Copy failed:", err));
+    .then(() => console.log("Percakapan disalin ke papan klip"))
+    .catch(err => console.error("Gagal menyalin:", err));
 };
 
 // First render

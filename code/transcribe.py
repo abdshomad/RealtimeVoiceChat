@@ -25,10 +25,10 @@ START_STT_SERVER = False # Set to True to use the client/server version of Realt
 DEFAULT_RECORDER_CONFIG: Dict[str, Any] = {
     "use_microphone": False,
     "spinner": False,
-    "model": "base.en",
-    "realtime_model_type": "base.en",
+    "model": "base",
+    "realtime_model_type": "base",
     "use_main_model_for_realtime": False,
-    "language": "en", # Default, will be overridden by source_language in __init__
+    "language": "id", # Default, will be overridden by source_language in __init__
     "silero_sensitivity": 0.05,
     "webrtc_sensitivity": 3,
     "post_speech_silence_duration": 0.7,
@@ -47,7 +47,7 @@ DEFAULT_RECORDER_CONFIG: Dict[str, Any] = {
     "allowed_latency_limit": 500,
     # Callbacks will be added dynamically in _create_recorder
     "debug_mode": True,
-    "initial_prompt_realtime": "The sky is blue. When the sky... She walked home. Because he... Today is sunny. If only I...",
+    "initial_prompt_realtime": "Langit biru. Ketika langit... Dia berjalan pulang. Karena dia... Hari ini cerah. Jika saja saya...",
     "faster_whisper_vad_filter": False,
 }
 

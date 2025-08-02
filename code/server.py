@@ -30,7 +30,8 @@ from starlette.responses import HTMLResponse, Response, FileResponse
 USE_SSL = False
 TTS_START_ENGINE = "orpheus"
 TTS_START_ENGINE = "kokoro"
-TTS_START_ENGINE = "coqui"
+# TTS_START_ENGINE = "coqui"  # Commented out due to PyTorch compatibility issue
+TTS_START_ENGINE = "mms"     # MMS-TTS Indonesian model - uncomment to enable
 TTS_ORPHEUS_MODEL = "Orpheus_3B-1BaseGGUF/mOrpheus_3B-1Base_Q4_K_M.gguf"
 TTS_ORPHEUS_MODEL = "orpheus-3b-0.1-ft-Q8_0-GGUF/orpheus-3b-0.1-ft-q8_0.gguf"
 
@@ -66,7 +67,7 @@ from audio_in import AudioInputProcessor
 from speech_pipeline_manager import SpeechPipelineManager
 from colors import Colors
 
-LANGUAGE = "en"
+LANGUAGE = "id"
 # TTS_FINAL_TIMEOUT = 0.5 # unsure if 1.0 is needed for stability
 TTS_FINAL_TIMEOUT = 1.0 # unsure if 1.0 is needed for stability
 

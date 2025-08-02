@@ -14,15 +14,21 @@ from huggingface_hub import hf_hub_download
 from RealtimeTTS import (CoquiEngine, KokoroEngine, OrpheusEngine,
                          OrpheusVoice, TextToAudioStream)
 
+# MMS-TTS imports
+import torch
+from transformers import VitsModel, AutoTokenizer
+import scipy.io.wavfile as wavfile
+
 logger = logging.getLogger(__name__)
 
 # Default configuration constants
-START_ENGINE = "kokoro"
+START_ENGINE = "kokoro"  # Using Kokoro as default due to Coqui PyTorch compatibility issues
 Silence = namedtuple("Silence", ("comma", "sentence", "default"))
 ENGINE_SILENCES = {
     "coqui":   Silence(comma=0.3, sentence=0.6, default=0.3),
     "kokoro":  Silence(comma=0.3, sentence=0.6, default=0.3),
     "orpheus": Silence(comma=0.3, sentence=0.6, default=0.3),
+    "mms":     Silence(comma=0.3, sentence=0.6, default=0.3),
 }
 # Stream chunk sizes influence latency vs. throughput trade-offs
 QUICK_ANSWER_STREAM_CHUNK_SIZE = 8
@@ -39,13 +45,13 @@ def create_directory(path: str) -> None:
     if not os.path.exists(path):
         os.makedirs(path)
 
-def ensure_lasinya_models(models_root: str = "models", model_name: str = "Lasinya") -> None:
+def ensure_xtts_models(models_root: str = "models", model_name: str = "XTTS") -> None:
     """
-    Ensures the Coqui XTTS Lasinya model files are present locally.
+    Ensures the Coqui XTTS v2 model files are present locally.
 
     Checks for required model files (config.json, vocab.json, etc.) within
     the specified directory structure. If any file is missing, it downloads
-    it from the 'KoljaB/XTTS_Lasinya' Hugging Face Hub repository.
+    it from the 'coqui/XTTS-v2' Hugging Face Hub repository.
 
     Args:
         models_root: The root directory where models are stored.
@@ -60,10 +66,131 @@ def ensure_lasinya_models(models_root: str = "models", model_name: str = "Lasiny
             # Not using logger here as it might not be configured yet during module import/init
             print(f"👄⏬ Downloading {fn} to {base}")
             hf_hub_download(
-                repo_id="KoljaB/XTTS_Lasinya",
+                repo_id="coqui/XTTS-v2",
                 filename=fn,
                 local_dir=base
             )
+
+
+class MMSTTSEngine:
+    """
+    Custom MMS-TTS engine for Indonesian text-to-speech using Facebook's MMS-TTS model.
+    
+    This engine integrates with the RealtimeTTS framework to provide Indonesian TTS
+    using the facebook/mms-tts-ind model from Hugging Face.
+    """
+    
+    def __init__(self, model_name: str = "facebook/mms-tts-ind"):
+        """
+        Initialize the MMS-TTS engine.
+        
+        Args:
+            model_name: The Hugging Face model name for MMS-TTS Indonesian
+        """
+        self.model_name = model_name
+        self.model = None
+        self.tokenizer = None
+        self.sampling_rate = 22050  # Default sampling rate for MMS-TTS
+        self._load_model()
+    
+    def _load_model(self):
+        """Load the MMS-TTS model and tokenizer."""
+        try:
+            logger.info(f"👄⏬ Loading MMS-TTS model: {self.model_name}")
+            self.model = VitsModel.from_pretrained(self.model_name)
+            self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+            
+            # Set model to evaluation mode
+            self.model.eval()
+            
+            # Move to GPU if available
+            if torch.cuda.is_available():
+                self.model = self.model.cuda()
+                logger.info("👄🚀 MMS-TTS model loaded on GPU")
+            else:
+                logger.info("👄💻 MMS-TTS model loaded on CPU")
+                
+        except Exception as e:
+            logger.error(f"👄❌ Failed to load MMS-TTS model: {e}")
+            raise
+    
+    def synthesize(self, text: str) -> bytes:
+        """
+        Synthesize audio from text using MMS-TTS.
+        
+        Args:
+            text: The text to synthesize
+            
+        Returns:
+            Audio data as bytes (16-bit PCM, 22050 Hz)
+        """
+        try:
+            # Tokenize the text
+            inputs = self.tokenizer(text, return_tensors="pt")
+            
+            # Move inputs to GPU if available
+            if torch.cuda.is_available():
+                inputs = {k: v.cuda() for k, v in inputs.items()}
+            
+            # Generate audio
+            with torch.no_grad():
+                output = self.model(**inputs).waveform
+            
+            # Convert to numpy array and ensure correct format
+            audio_np = output.cpu().numpy().squeeze()
+            
+            # Convert to 16-bit PCM
+            audio_int16 = (audio_np * 32767).astype(np.int16)
+            
+            # Convert to bytes
+            audio_bytes = audio_int16.tobytes()
+            
+            return audio_bytes
+            
+        except Exception as e:
+            logger.error(f"👄❌ MMS-TTS synthesis failed: {e}")
+            # Return silence as fallback
+            silence_samples = np.zeros(22050, dtype=np.int16)  # 1 second of silence
+            return silence_samples.tobytes()
+    
+    def get_sampling_rate(self) -> int:
+        """Get the sampling rate of the model."""
+        return self.sampling_rate
+
+
+class MMSTTSWrapper:
+    """
+    Wrapper class to integrate MMS-TTS with RealtimeTTS framework.
+    
+    This class implements the interface expected by RealtimeTTS's TextToAudioStream.
+    """
+    
+    def __init__(self, model_name: str = "facebook/mms-tts-ind"):
+        """
+        Initialize the MMS-TTS wrapper.
+        
+        Args:
+            model_name: The Hugging Face model name for MMS-TTS Indonesian
+        """
+        self.mms_engine = MMSTTSEngine(model_name)
+        self.sampling_rate = self.mms_engine.get_sampling_rate()
+    
+    def synthesize(self, text: str) -> bytes:
+        """
+        Synthesize audio from text using MMS-TTS.
+        
+        Args:
+            text: The text to synthesize
+            
+        Returns:
+            Audio data as bytes (16-bit PCM, 22050 Hz)
+        """
+        return self.mms_engine.synthesize(text)
+    
+    def get_sampling_rate(self) -> int:
+        """Get the sampling rate of the model."""
+        return self.sampling_rate
+
 
 class AudioProcessor:
     """
@@ -103,12 +230,13 @@ class AudioProcessor:
 
         # Dynamically load and configure the selected TTS engine
         if engine == "coqui":
-            ensure_lasinya_models(models_root="models", model_name="Lasinya")
+            ensure_xtts_models(models_root="models", model_name="XTTS")
             self.engine = CoquiEngine(
-                specific_model="Lasinya",
+                specific_model="XTTS",
                 local_models_path="./models",
                 voice="reference_audio.wav",
-                speed=1.1,
+                speed=1.0,
+                language="id",  # Set language to Indonesian
                 use_deepspeed=True,
                 thread_count=6,
                 stream_chunk_size=self.current_stream_chunk_size,
@@ -139,17 +267,24 @@ class AudioProcessor:
             )
             voice = OrpheusVoice("tara")
             self.engine.set_voice(voice)
+        elif engine == "mms":
+            self.engine = MMSTTSWrapper()
+            # For MMS-TTS, we don't use RealtimeTTS stream as it doesn't support streaming
+            self.stream = None
         else:
             raise ValueError(f"Unsupported engine: {engine}")
 
 
-        # Initialize the RealtimeTTS stream
-        self.stream = TextToAudioStream(
-            self.engine,
-            muted=True, # Do not play audio directly
-            playout_chunk_size=4096, # Internal chunk size for processing
-            on_audio_stream_stop=self.on_audio_stream_stop,
-        )
+        # Initialize the RealtimeTTS stream (only for supported engines)
+        if engine != "mms":
+            self.stream = TextToAudioStream(
+                self.engine,
+                muted=True, # Do not play audio directly
+                playout_chunk_size=4096, # Internal chunk size for processing
+                on_audio_stream_stop=self.on_audio_stream_stop,
+            )
+        else:
+            self.stream = None
 
         # Ensure Coqui engine starts with the quick chunk size
         if self.engine_name == "coqui" and hasattr(self.engine, 'set_stream_chunk_size') and self.current_stream_chunk_size != QUICK_ANSWER_STREAM_CHUNK_SIZE:
@@ -157,62 +292,67 @@ class AudioProcessor:
             self.engine.set_stream_chunk_size(QUICK_ANSWER_STREAM_CHUNK_SIZE)
             self.current_stream_chunk_size = QUICK_ANSWER_STREAM_CHUNK_SIZE
 
-        # Prewarm the engine
-        self.stream.feed("prewarm")
-        play_kwargs = dict(
-            log_synthesized_text=False, # Don't log prewarm text
-            muted=True,
-            fast_sentence_fragment=False,
-            comma_silence_duration=self.silence.comma,
-            sentence_silence_duration=self.silence.sentence,
-            default_silence_duration=self.silence.default,
-            force_first_fragment_after_words=999999, # Effectively disable this
-        )
-        self.stream.play(**play_kwargs) # Synchronous play for prewarm
-        # Wait for prewarm to finish (indicated by on_audio_stream_stop)
-        while self.stream.is_playing():
-            time.sleep(0.01)
-        self.finished_event.wait() # Wait for stop callback
-        self.finished_event.clear()
+        # Prewarm the engine (only for streaming engines)
+        if self.stream is not None:
+            self.stream.feed("prewarm")
+            play_kwargs = dict(
+                log_synthesized_text=False, # Don't log prewarm text
+                muted=True,
+                fast_sentence_fragment=False,
+                comma_silence_duration=self.silence.comma,
+                sentence_silence_duration=self.silence.sentence,
+                default_silence_duration=self.silence.default,
+                force_first_fragment_after_words=999999, # Effectively disable this
+            )
+            self.stream.play(**play_kwargs) # Synchronous play for prewarm
+            # Wait for prewarm to finish (indicated by on_audio_stream_stop)
+            while self.stream.is_playing():
+                time.sleep(0.01)
+            self.finished_event.wait() # Wait for stop callback
+            self.finished_event.clear()
 
-        # Measure Time To First Audio (TTFA)
-        start_time = time.time()
-        ttfa = None
-        def on_audio_chunk_ttfa(chunk: bytes):
-            nonlocal ttfa
-            if ttfa is None:
-                ttfa = time.time() - start_time
-                logger.debug(f"👄⏱️ TTFA measurement first chunk arrived, TTFA: {ttfa:.2f}s.")
+            # Measure Time To First Audio (TTFA)
+            start_time = time.time()
+            ttfa = None
+            def on_audio_chunk_ttfa(chunk: bytes):
+                nonlocal ttfa
+                if ttfa is None:
+                    ttfa = time.time() - start_time
+                    logger.debug(f"👄⏱️ TTFA measurement first chunk arrived, TTFA: {ttfa:.2f}s.")
 
-        self.stream.feed("This is a test sentence to measure the time to first audio chunk.")
-        play_kwargs_ttfa = dict(
-            on_audio_chunk=on_audio_chunk_ttfa,
-            log_synthesized_text=False, # Don't log test sentence
-            muted=True,
-            fast_sentence_fragment=False,
-            comma_silence_duration=self.silence.comma,
-            sentence_silence_duration=self.silence.sentence,
-            default_silence_duration=self.silence.default,
-            force_first_fragment_after_words=999999,
-        )
-        self.stream.play_async(**play_kwargs_ttfa)
+            self.stream.feed("This is a test sentence to measure the time to first audio chunk.")
+            play_kwargs_ttfa = dict(
+                on_audio_chunk=on_audio_chunk_ttfa,
+                log_synthesized_text=False, # Don't log test sentence
+                muted=True,
+                fast_sentence_fragment=False,
+                comma_silence_duration=self.silence.comma,
+                sentence_silence_duration=self.silence.sentence,
+                default_silence_duration=self.silence.default,
+                force_first_fragment_after_words=999999,
+            )
+            self.stream.play_async(**play_kwargs_ttfa)
 
-        # Wait until the first chunk arrives or stream finishes
-        while ttfa is None and (self.stream.is_playing() or not self.finished_event.is_set()):
-            time.sleep(0.01)
-        self.stream.stop() # Ensure stream stops cleanly
+            # Wait until the first chunk arrives or stream finishes
+            while ttfa is None and (self.stream.is_playing() or not self.finished_event.is_set()):
+                time.sleep(0.01)
+            self.stream.stop() # Ensure stream stops cleanly
 
-        # Wait for stop callback if it hasn't fired yet
-        if not self.finished_event.is_set():
-            self.finished_event.wait(timeout=2.0) # Add timeout for safety
-        self.finished_event.clear()
+            # Wait for stop callback if it hasn't fired yet
+            if not self.finished_event.is_set():
+                self.finished_event.wait(timeout=2.0) # Add timeout for safety
+            self.finished_event.clear()
 
-        if ttfa is not None:
-            logger.debug(f"👄⏱️ TTFA measurement complete. TTFA: {ttfa:.2f}s.")
-            self.tts_inference_time = ttfa * 1000  # Store as ms
+            if ttfa is not None:
+                logger.debug(f"👄⏱️ TTFA measurement complete. TTFA: {ttfa:.2f}s.")
+                self.tts_inference_time = ttfa * 1000  # Store as ms
+            else:
+                logger.warning("👄⚠️ TTFA measurement failed (no audio chunk received).")
+                self.tts_inference_time = 0
         else:
-            logger.warning("👄⚠️ TTFA measurement failed (no audio chunk received).")
-            self.tts_inference_time = 0
+            # For non-streaming engines like MMS-TTS, measure TTFA differently
+            logger.info("👄⚙️ Non-streaming engine detected, skipping stream prewarm and TTFA measurement.")
+            self.tts_inference_time = 0  # Will be measured on first synthesis
 
         # Callbacks to be set externally if needed
         self.on_first_audio_chunk_synthesize: Optional[Callable[[], None]] = None
@@ -253,6 +393,39 @@ class AudioProcessor:
         Returns:
             True if synthesis completed fully, False if interrupted by stop_event.
         """
+        # Handle MMS-TTS engine differently since it doesn't support streaming
+        if self.engine_name == "mms":
+            logger.info(f"👄🎵 {generation_string} MMS-TTS synthesizing: {text[:50]}...")
+            
+            # Check for interruption
+            if stop_event.is_set():
+                logger.info(f"👄🛑 {generation_string} MMS-TTS synthesis interrupted before start.")
+                return False
+            
+            try:
+                # Synthesize the entire text at once
+                audio_bytes = self.engine.synthesize(text)
+                
+                # Check for interruption after synthesis
+                if stop_event.is_set():
+                    logger.info(f"👄🛑 {generation_string} MMS-TTS synthesis interrupted after generation.")
+                    return False
+                
+                # Put the audio into the queue
+                audio_chunks.put(audio_bytes)
+                
+                # Trigger first chunk callback if set
+                if self.on_first_audio_chunk_synthesize:
+                    self.on_first_audio_chunk_synthesize()
+                
+                logger.info(f"👄✅ {generation_string} MMS-TTS synthesis complete. Text: {text[:50]}...")
+                return True
+                
+            except Exception as e:
+                logger.error(f"👄❌ {generation_string} MMS-TTS synthesis failed: {e}")
+                return False
+        
+        # Handle other engines with streaming
         if self.engine_name == "coqui" and hasattr(self.engine, 'set_stream_chunk_size') and self.current_stream_chunk_size != QUICK_ANSWER_STREAM_CHUNK_SIZE:
             logger.info(f"👄⚙️ {generation_string} Setting Coqui stream chunk size to {QUICK_ANSWER_STREAM_CHUNK_SIZE} for quick synthesis.")
             self.engine.set_stream_chunk_size(QUICK_ANSWER_STREAM_CHUNK_SIZE)
@@ -435,6 +608,48 @@ class AudioProcessor:
         Returns:
             True if synthesis completed fully, False if interrupted by stop_event.
         """
+        # Handle MMS-TTS engine differently since it doesn't support streaming
+        if self.engine_name == "mms":
+            logger.info(f"👄🎵 {generation_string} MMS-TTS synthesizing from generator...")
+            
+            # Check for interruption
+            if stop_event.is_set():
+                logger.info(f"👄🛑 {generation_string} MMS-TTS generator synthesis interrupted before start.")
+                return False
+            
+            try:
+                # Collect all text from generator
+                full_text = ""
+                for chunk in generator:
+                    # Check for interruption during text collection
+                    if stop_event.is_set():
+                        logger.info(f"👄🛑 {generation_string} MMS-TTS generator synthesis interrupted during text collection.")
+                        return False
+                    full_text += chunk
+                
+                # Check for interruption after text collection
+                if stop_event.is_set():
+                    logger.info(f"👄🛑 {generation_string} MMS-TTS generator synthesis interrupted after text collection.")
+                    return False
+                
+                # Synthesize the complete text
+                audio_bytes = self.engine.synthesize(full_text)
+                
+                # Put the audio into the queue
+                audio_chunks.put(audio_bytes)
+                
+                # Trigger first chunk callback if set
+                if self.on_first_audio_chunk_synthesize:
+                    self.on_first_audio_chunk_synthesize()
+                
+                logger.info(f"👄✅ {generation_string} MMS-TTS generator synthesis complete. Text: {full_text[:50]}...")
+                return True
+                
+            except Exception as e:
+                logger.error(f"👄❌ {generation_string} MMS-TTS generator synthesis failed: {e}")
+                return False
+        
+        # Handle other engines with streaming
         if self.engine_name == "coqui" and hasattr(self.engine, 'set_stream_chunk_size') and self.current_stream_chunk_size != FINAL_ANSWER_STREAM_CHUNK_SIZE:
             logger.info(f"👄⚙️ {generation_string} Setting Coqui stream chunk size to {FINAL_ANSWER_STREAM_CHUNK_SIZE} for generator synthesis.")
             self.engine.set_stream_chunk_size(FINAL_ANSWER_STREAM_CHUNK_SIZE)
