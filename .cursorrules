@@ -1,16 +1,17 @@
 # Cursor Rules for RealtimeVoiceChat Docker Compose Development
 
 ## Development Environment Setup
-- Always run the application using Docker Compose
+- Always run the application using Docker Compose with development configuration
+- Use `docker-compose-dev.yml` for development environment
 - Use `.env` file for environment variables (especially PORT)
 - Mount current directory to Docker container for live code changes
 - No need to rebuild Docker when code changes
 
 ## Docker Compose Configuration
-- Use `docker-compose up` to start the application
-- Use `docker-compose down` to stop the application
-- Use `docker-compose logs -f` to view logs
-- Use `docker-compose restart` to restart services
+- Use `docker-compose -f docker-compose-dev.yml up` to start the application
+- Use `docker-compose -f docker-compose-dev.yml down` to stop the application
+- Use `docker-compose -f docker-compose-dev.yml logs -f` to view logs
+- Use `docker-compose -f docker-compose-dev.yml restart` to restart services
 
 ## Environment Variables
 - Load PORT from `.env` file
@@ -19,7 +20,8 @@
 
 ## File Structure
 - `.env` - Environment variables (PORT, etc.)
-- `docker-compose.yml` - Docker Compose configuration
+- `docker-compose-dev.yml` - Development Docker Compose configuration
+- `docker-compose.yml` - Production Docker Compose configuration
 - `Dockerfile` - Container definition
 - Volume mount: `.:/app` for live code changes
 
@@ -27,24 +29,24 @@
 1. Make code changes in the current directory
 2. Changes are automatically reflected in the running container
 3. No need to rebuild Docker image for code changes
-4. Use `docker-compose restart` only for environment variable changes
+4. Use `docker-compose -f docker-compose-dev.yml restart` only for environment variable changes
 
 ## Commands to Remember
 ```bash
-# Start the application
-docker-compose up -d
+# Start the application (development)
+docker-compose -f docker-compose-dev.yml up -d
 
-# View logs
-docker-compose logs -f
+# View logs (development)
+docker-compose -f docker-compose-dev.yml logs -f
 
-# Stop the application
-docker-compose down
+# Stop the application (development)
+docker-compose -f docker-compose-dev.yml down
 
-# Restart services
-docker-compose restart
+# Restart services (development)
+docker-compose -f docker-compose-dev.yml restart
 
 # Rebuild and start (only needed for Dockerfile changes)
-docker-compose up --build
+docker-compose -f docker-compose-dev.yml up --build
 ```
 
 ## Documentation Management
@@ -62,4 +64,5 @@ docker-compose up --build
 - Keep Docker Compose configuration in version control
 - Use `.dockerignore` to exclude unnecessary files from build context
 - Maintain up-to-date documentation in `./docs/INSTALL.md`
-- **Create and maintain comprehensive troubleshooting guide in `./docs/TROUBLESHOOT.md`** 
+- **Create and maintain comprehensive troubleshooting guide in `./docs/TROUBLESHOOT.md`**
+- Use `docker-compose-dev.yml` for development and `docker-compose.yml` for production 
