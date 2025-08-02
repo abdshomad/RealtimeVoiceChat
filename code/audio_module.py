@@ -23,6 +23,7 @@ ENGINE_SILENCES = {
     "coqui":   Silence(comma=0.3, sentence=0.6, default=0.3),
     "kokoro":  Silence(comma=0.3, sentence=0.6, default=0.3),
     "orpheus": Silence(comma=0.3, sentence=0.6, default=0.3),
+    "indonesian": Silence(comma=0.3, sentence=0.6, default=0.3),
 }
 # Stream chunk sizes influence latency vs. throughput trade-offs
 QUICK_ANSWER_STREAM_CHUNK_SIZE = 8
@@ -63,6 +64,151 @@ def ensure_lasinya_models(models_root: str = "models", model_name: str = "Lasiny
                 filename=fn,
                 local_dir=base
             )
+
+def ensure_indonesian_tts_models(models_root: str = "models", model_name: str = "indonesian-tts") -> None:
+    """
+    Ensures the Indonesian TTS model files are present locally.
+
+    Downloads the Indonesian TTS model from the Wikidepia repository.
+    The model files are downloaded from the releases section.
+
+    Args:
+        models_root: The root directory where models are stored.
+        model_name: The specific name of the model subdirectory.
+    """
+    base = os.path.join(models_root, model_name)
+    create_directory(base)
+    
+    # Model files to download from Indonesian TTS v1.2
+    files = ["checkpoint.pth", "config.json"]
+    for fn in files:
+        local_file = os.path.join(base, fn)
+        if not os.path.exists(local_file):
+            # Not using logger here as it might not be configured yet during module import/init
+            print(f"👄⏬ Downloading Indonesian TTS {fn} to {base}")
+            hf_hub_download(
+                repo_id="Wikidepia/indonesian-tts",
+                filename=fn,
+                local_dir=base
+            )
+
+class IndonesianTTSEngine:
+    """
+    Custom Indonesian TTS engine that integrates with RealtimeTTS framework.
+    
+    This engine uses the Indonesian TTS model from Wikidepia repository
+    and provides streaming audio synthesis capabilities.
+    """
+    def __init__(self, model_path: str = "/app/code/models/indonesian-tts", speaker: str = "wibowo"):
+        """
+        Initialize the Indonesian TTS engine.
+        
+        Args:
+            model_path: Path to the Indonesian TTS model files
+            speaker: Speaker to use (ardi, gadis, wibowo)
+        """
+        from TTS.api import TTS
+        import g2p_id
+        
+        self.model_path = model_path
+        self.speaker = speaker
+        self.tts = TTS(
+            model_path=model_path,
+            progress_bar=False,
+            gpu=False  # Set to True if GPU is available
+        )
+        self.g2p = g2p_id.G2p()
+        
+    def synthesize(self, text: str) -> bytes:
+        """
+        Synthesize audio from text using Indonesian TTS.
+        
+        Args:
+            text: Text to synthesize
+            
+        Returns:
+            Audio data as bytes
+        """
+        # Convert text to phonemes using g2p-id
+        phonemes = self.g2p(text)
+        phoneme_text = " ".join(phonemes)
+        
+        # Synthesize audio using TTS
+        wav = self.tts.tts(
+            text=phoneme_text,
+            speaker=self.speaker,
+            file_path=None
+        )
+        
+        # Convert numpy array to bytes
+        import wave
+        import io
+        import numpy as np
+        
+        # Create a temporary buffer to write WAV data
+        buffer = io.BytesIO()
+        
+        # Write WAV file to buffer
+        with wave.open(buffer, 'wb') as wav_file:
+            wav_file.setnchannels(1)  # Mono
+            wav_file.setsampwidth(2)  # 16-bit
+            wav_file.setframerate(22050)  # Sample rate
+            wav_file.writeframes((wav * 32767).astype(np.int16).tobytes())
+        
+        return buffer.getvalue()
+
+class IndonesianTTSEngineAdapter:
+    """
+    Adapter class to make Indonesian TTS work with RealtimeTTS framework.
+    """
+    def __init__(self, model_path: str = "/app/code/models/indonesian-tts", speaker: str = "wibowo"):
+        self.engine = IndonesianTTSEngine(model_path, speaker)
+        
+    def synthesize(self, text: str) -> bytes:
+        return self.engine.synthesize(text)
+        
+    def set_speaker(self, speaker: str):
+        """Change the speaker for Indonesian TTS."""
+        self.engine.speaker = speaker
+
+class IndonesianTTSEngineStream:
+    """
+    Streaming wrapper for Indonesian TTS that works with RealtimeTTS.
+    """
+    def __init__(self, model_path: str = "/app/code/models/indonesian-tts", speaker: str = "wibowo"):
+        self.engine = IndonesianTTSEngine(model_path, speaker)
+        self.is_playing = False
+        
+    def feed(self, text: str):
+        """Feed text to the engine (compatibility with RealtimeTTS)."""
+        self.current_text = text
+        
+    def play(self, **kwargs):
+        """Synthesize and return audio data."""
+        if hasattr(self, 'current_text'):
+            audio_data = self.engine.synthesize(self.current_text)
+            # Convert to chunks for streaming
+            chunk_size = 4096  # 4KB chunks
+            chunks = []
+            for i in range(0, len(audio_data), chunk_size):
+                chunk = audio_data[i:i + chunk_size]
+                if kwargs.get('on_audio_chunk'):
+                    kwargs['on_audio_chunk'](chunk)
+                chunks.append(chunk)
+            return chunks
+        return []
+        
+    def play_async(self, **kwargs):
+        """Asynchronous play method."""
+        return self.play(**kwargs)
+        
+    def is_playing(self):
+        """Check if currently playing."""
+        return self.is_playing
+        
+    def stop(self):
+        """Stop playback."""
+        self.is_playing = False
 
 class AudioProcessor:
     """
@@ -138,17 +284,32 @@ class AudioProcessor:
             )
             voice = OrpheusVoice("tara")
             self.engine.set_voice(voice)
+        elif engine == "indonesian":
+            ensure_indonesian_tts_models(models_root="/app/code/models", model_name="indonesian-tts")
+            
+            # Initialize Indonesian TTS with the downloaded model
+            model_path = "/app/code/models/indonesian-tts"
+            self.engine = IndonesianTTSEngineStream(
+                model_path=model_path,
+                speaker="wibowo"  # Default speaker
+            )
+            # Store speaker for potential changes
+            self.indonesian_speaker = "wibowo"
         else:
             raise ValueError(f"Unsupported engine: {engine}")
 
 
-        # Initialize the RealtimeTTS stream
-        self.stream = TextToAudioStream(
-            self.engine,
-            muted=True, # Do not play audio directly
-            playout_chunk_size=4096, # Internal chunk size for processing
-            on_audio_stream_stop=self.on_audio_stream_stop,
-        )
+        # Initialize the RealtimeTTS stream (only for engines that support it)
+        if engine != "indonesian":
+            self.stream = TextToAudioStream(
+                self.engine,
+                muted=True, # Do not play audio directly
+                playout_chunk_size=4096, # Internal chunk size for processing
+                on_audio_stream_stop=self.on_audio_stream_stop,
+            )
+        else:
+            # For Indonesian TTS, we use the custom stream directly
+            self.stream = self.engine
 
         # Ensure Coqui engine starts with the quick chunk size
         if self.engine_name == "coqui" and hasattr(self.engine, 'set_stream_chunk_size') and self.current_stream_chunk_size != QUICK_ANSWER_STREAM_CHUNK_SIZE:
@@ -156,50 +317,51 @@ class AudioProcessor:
             self.engine.set_stream_chunk_size(QUICK_ANSWER_STREAM_CHUNK_SIZE)
             self.current_stream_chunk_size = QUICK_ANSWER_STREAM_CHUNK_SIZE
 
-        # Prewarm the engine
-        self.stream.feed("prewarm")
-        play_kwargs = dict(
-            log_synthesized_text=False, # Don't log prewarm text
-            muted=True,
-            fast_sentence_fragment=False,
-            comma_silence_duration=self.silence.comma,
-            sentence_silence_duration=self.silence.sentence,
-            default_silence_duration=self.silence.default,
-            force_first_fragment_after_words=999999, # Effectively disable this
-        )
-        self.stream.play(**play_kwargs) # Synchronous play for prewarm
-        # Wait for prewarm to finish (indicated by on_audio_stream_stop)
-        while self.stream.is_playing():
-            time.sleep(0.01)
-        self.finished_event.wait() # Wait for stop callback
-        self.finished_event.clear()
+        # Prewarm the engine (skip for Indonesian TTS as it's not streaming)
+        if engine != "indonesian":
+            self.stream.feed("prewarm")
+            play_kwargs = dict(
+                log_synthesized_text=False, # Don't log prewarm text
+                muted=True,
+                fast_sentence_fragment=False,
+                comma_silence_duration=self.silence.comma,
+                sentence_silence_duration=self.silence.sentence,
+                default_silence_duration=self.silence.default,
+                force_first_fragment_after_words=999999, # Effectively disable this
+            )
+            self.stream.play(**play_kwargs) # Synchronous play for prewarm
+            # Wait for prewarm to finish (indicated by on_audio_stream_stop)
+            while self.stream.is_playing():
+                time.sleep(0.01)
+            self.finished_event.wait() # Wait for stop callback
+            self.finished_event.clear()
 
-        # Measure Time To First Audio (TTFA)
-        start_time = time.time()
-        ttfa = None
-        def on_audio_chunk_ttfa(chunk: bytes):
-            nonlocal ttfa
-            if ttfa is None:
-                ttfa = time.time() - start_time
-                logger.debug(f"👄⏱️ TTFA measurement first chunk arrived, TTFA: {ttfa:.2f}s.")
+            # Measure Time To First Audio (TTFA)
+            start_time = time.time()
+            ttfa = None
+            def on_audio_chunk_ttfa(chunk: bytes):
+                nonlocal ttfa
+                if ttfa is None:
+                    ttfa = time.time() - start_time
+                    logger.debug(f"👄⏱️ TTFA measurement first chunk arrived, TTFA: {ttfa:.2f}s.")
 
-        self.stream.feed("This is a test sentence to measure the time to first audio chunk.")
-        play_kwargs_ttfa = dict(
-            on_audio_chunk=on_audio_chunk_ttfa,
-            log_synthesized_text=False, # Don't log test sentence
-            muted=True,
-            fast_sentence_fragment=False,
-            comma_silence_duration=self.silence.comma,
-            sentence_silence_duration=self.silence.sentence,
-            default_silence_duration=self.silence.default,
-            force_first_fragment_after_words=999999,
-        )
-        self.stream.play_async(**play_kwargs_ttfa)
+            self.stream.feed("This is a test sentence to measure the time to first audio chunk.")
+            play_kwargs_ttfa = dict(
+                on_audio_chunk=on_audio_chunk_ttfa,
+                log_synthesized_text=False, # Don't log test sentence
+                muted=True,
+                fast_sentence_fragment=False,
+                comma_silence_duration=self.silence.comma,
+                sentence_silence_duration=self.silence.sentence,
+                default_silence_duration=self.silence.default,
+                force_first_fragment_after_words=999999,
+            )
+            self.stream.play_async(**play_kwargs_ttfa)
 
-        # Wait until the first chunk arrives or stream finishes
-        while ttfa is None and (self.stream.is_playing() or not self.finished_event.is_set()):
-            time.sleep(0.01)
-        self.stream.stop() # Ensure stream stops cleanly
+            # Wait until the first chunk arrives or stream finishes
+            while ttfa is None and (self.stream.is_playing() or not self.finished_event.is_set()):
+                time.sleep(0.01)
+            self.stream.stop() # Ensure stream stops cleanly
 
         # Wait for stop callback if it hasn't fired yet
         if not self.finished_event.is_set():
@@ -256,6 +418,29 @@ class AudioProcessor:
             logger.info(f"👄⚙️ {generation_string} Setting Coqui stream chunk size to {QUICK_ANSWER_STREAM_CHUNK_SIZE} for quick synthesis.")
             self.engine.set_stream_chunk_size(QUICK_ANSWER_STREAM_CHUNK_SIZE)
             self.current_stream_chunk_size = QUICK_ANSWER_STREAM_CHUNK_SIZE
+
+        # Handle Indonesian TTS differently (non-streaming)
+        if self.engine_name == "indonesian":
+            logger.info(f"👄🇮🇩 {generation_string} Synthesizing Indonesian TTS for text: {text[:50]}...")
+            try:
+                # Synthesize audio using Indonesian TTS
+                audio_data = self.engine.synthesize(text)
+                
+                # Split audio data into chunks
+                chunk_size = 4096  # 4KB chunks
+                for i in range(0, len(audio_data), chunk_size):
+                    if stop_event.is_set():
+                        logger.info(f"👄🛑 {generation_string} Indonesian TTS synthesis interrupted.")
+                        return False
+                    
+                    chunk = audio_data[i:i + chunk_size]
+                    audio_chunks.put(chunk)
+                
+                logger.info(f"👄✅ {generation_string} Indonesian TTS synthesis completed.")
+                return True
+            except Exception as e:
+                logger.error(f"👄❌ {generation_string} Indonesian TTS synthesis failed: {e}")
+                return False
 
         self.stream.feed(text)
         self.finished_event.clear() # Reset finished event before starting
@@ -438,6 +623,37 @@ class AudioProcessor:
             logger.info(f"👄⚙️ {generation_string} Setting Coqui stream chunk size to {FINAL_ANSWER_STREAM_CHUNK_SIZE} for generator synthesis.")
             self.engine.set_stream_chunk_size(FINAL_ANSWER_STREAM_CHUNK_SIZE)
             self.current_stream_chunk_size = FINAL_ANSWER_STREAM_CHUNK_SIZE
+
+        # Handle Indonesian TTS differently (non-streaming)
+        if self.engine_name == "indonesian":
+            logger.info(f"👄🇮🇩 {generation_string} Synthesizing Indonesian TTS from generator...")
+            try:
+                # Collect all text from generator
+                full_text = ""
+                for text_chunk in generator:
+                    if stop_event.is_set():
+                        logger.info(f"👄🛑 {generation_string} Indonesian TTS generator synthesis interrupted.")
+                        return False
+                    full_text += text_chunk
+                
+                # Synthesize audio using Indonesian TTS
+                audio_data = self.engine.synthesize(full_text)
+                
+                # Split audio data into chunks
+                chunk_size = 4096  # 4KB chunks
+                for i in range(0, len(audio_data), chunk_size):
+                    if stop_event.is_set():
+                        logger.info(f"👄🛑 {generation_string} Indonesian TTS synthesis interrupted.")
+                        return False
+                    
+                    chunk = audio_data[i:i + chunk_size]
+                    audio_chunks.put(chunk)
+                
+                logger.info(f"👄✅ {generation_string} Indonesian TTS generator synthesis completed.")
+                return True
+            except Exception as e:
+                logger.error(f"👄❌ {generation_string} Indonesian TTS generator synthesis failed: {e}")
+                return False
 
         # Feed the generator to the stream
         self.stream.feed(generator)

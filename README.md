@@ -34,7 +34,8 @@ A sophisticated client-server system built for low-latency interaction:
 *   **Low Latency Focus:** Optimized architecture using audio chunk streaming.
 *   **Smart Turn-Taking:** Dynamic silence detection (`turndetect.py`) adapts to the conversation pace.
 *   **Flexible AI Brains:** Pluggable LLM backends (Ollama default, OpenAI support via `llm_module.py`).
-*   **Customizable Voices:** Choose from different Text-to-Speech engines (Kokoro, Coqui, Orpheus via `audio_module.py`).
+*   **Customizable Voices:** Choose from different Text-to-Speech engines (Kokoro, Coqui, Orpheus, Indonesian TTS via `audio_module.py`).
+*   **Indonesian TTS Support:** Built-in support for Indonesian Text-to-Speech using the [Wikidepia Indonesian TTS](https://github.com/Wikidepia/indonesian-tts) model with multiple speakers (Ardi, Gadis, Wibowo).
 *   **Web Interface:** Clean and simple UI using Vanilla JS and the Web Audio API.
 *   **Dockerized Deployment:** Recommended setup using Docker Compose for easier dependency management.
 
@@ -220,8 +221,9 @@ Want to tweak the AI's voice, brain, or how it listens? Modify the Python files 
 **⚠️ Important Docker Note:** If using Docker, make any configuration changes *before* running `docker compose build` to ensure they are included in the image.
 
 *   **TTS Engine & Voice (`server.py`, `audio_module.py`):**
-    *   Change `START_ENGINE` in `server.py` to `"coqui"`, `"kokoro"`, or `"orpheus"`.
+    *   Change `START_ENGINE` in `server.py` to `"coqui"`, `"kokoro"`, `"orpheus"`, or `"indonesian"`.
     *   Adjust engine-specific settings (e.g., voice model path for Coqui, speaker ID for Orpheus, speed) within `AudioProcessor.__init__` in `audio_module.py`.
+    *   For Indonesian TTS, you can change the speaker by modifying the `speaker` parameter in the `IndonesianTTSEngine` initialization (available speakers: "ardi", "gadis", "wibowo").
 *   **LLM Backend & Model (`server.py`, `llm_module.py`):**
     *   Set `LLM_START_PROVIDER` (`"ollama"` or `"openai"`) and `LLM_START_MODEL` (e.g., `"hf.co/..."` for Ollama, model name for OpenAI) in `server.py`. Remember to pull the Ollama model if using Docker (see Installation Step A3).
     *   Customize the AI's personality by editing `system_prompt.txt`.
