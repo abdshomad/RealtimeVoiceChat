@@ -24,7 +24,7 @@ except ImportError as e:
     logger.warning(f"⚠️ Could not apply Coqui patch: {e}")
 
 # Default configuration constants
-START_ENGINE = "kokoro"
+START_ENGINE = os.getenv("TTS_START_ENGINE", "kokoro")
 Silence = namedtuple("Silence", ("comma", "sentence", "default"))
 ENGINE_SILENCES = {
     "coqui":   Silence(comma=0.3, sentence=0.6, default=0.3),
@@ -104,11 +104,19 @@ class AudioProcessor:
         self.audio_chunks = asyncio.Queue() # Queue for synthesized audio output
         self.orpheus_model = orpheus_model
 
+        # Add comprehensive logging to verify engine selection
+        logger.info(f"🔧 TTS Engine Configuration:")
+        logger.info(f"   - Environment TTS_START_ENGINE: {os.getenv('TTS_START_ENGINE', 'NOT_SET')}")
+        logger.info(f"   - START_ENGINE constant: {START_ENGINE}")
+        logger.info(f"   - Selected engine parameter: {engine}")
+        logger.info(f"   - Engine name: {self.engine_name}")
+
         self.silence = ENGINE_SILENCES.get(engine, ENGINE_SILENCES[self.engine_name])
         self.current_stream_chunk_size = QUICK_ANSWER_STREAM_CHUNK_SIZE # Initial chunk size
 
         # Dynamically load and configure the selected TTS engine
         if engine == "coqui":
+            logger.info(f"🚀 Initializing COQUI TTS Engine...")
             ensure_lasinya_models(models_root="/app/code/models", model_name="Lasinya")
             self.engine = CoquiEngine(
                 specific_model="Lasinya",
@@ -124,7 +132,9 @@ class AudioProcessor:
                 load_balancing_cut_off=0.1,
                 add_sentence_filter=True,
             )
+            logger.info(f"✅ COQUI TTS Engine initialized successfully")
         elif engine == "kokoro":
+            logger.info(f"🚀 Initializing KOKORO TTS Engine...")
             self.engine = KokoroEngine(
                 voice="af_heart",
                 default_speed=1.26,
@@ -135,7 +145,9 @@ class AudioProcessor:
                 fade_in_ms=15,
                 fade_out_ms=10,
             )
+            logger.info(f"✅ KOKORO TTS Engine initialized successfully")
         elif engine == "orpheus":
+            logger.info(f"🚀 Initializing ORPHEUS TTS Engine...")
             self.engine = OrpheusEngine(
                 model=self.orpheus_model,
                 temperature=0.8,
@@ -145,17 +157,21 @@ class AudioProcessor:
             )
             voice = OrpheusVoice("tara")
             self.engine.set_voice(voice)
+            logger.info(f"✅ ORPHEUS TTS Engine initialized successfully")
         else:
+            logger.error(f"❌ Unsupported engine: {engine}")
             raise ValueError(f"Unsupported engine: {engine}")
 
 
         # Initialize the RealtimeTTS stream
+        logger.info(f"🔧 Creating TextToAudioStream with engine type: {type(self.engine).__name__}")
         self.stream = TextToAudioStream(
             self.engine,
             muted=True, # Do not play audio directly
             playout_chunk_size=4096, # Internal chunk size for processing
             on_audio_stream_stop=self.on_audio_stream_stop,
         )
+        logger.info(f"✅ TextToAudioStream created successfully with {self.engine_name} engine")
 
         # Ensure Coqui engine starts with the quick chunk size
         if self.engine_name == "coqui" and hasattr(self.engine, 'set_stream_chunk_size') and self.current_stream_chunk_size != QUICK_ANSWER_STREAM_CHUNK_SIZE:

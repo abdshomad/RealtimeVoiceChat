@@ -15,7 +15,7 @@ services:
       # --- Other App Environment Variables ---
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - MAX_AUDIO_QUEUE_SIZE=${MAX_AUDIO_QUEUE_SIZE:-50}
-      - TTS_START_ENGINE=${TTS_START_ENGINE:-kokoro}
+      - TTS_START_ENGINE=${TTS_START_ENGINE:-coqui}
       - NVIDIA_VISIBLE_DEVICES=all # For app's PyTorch/DeepSpeed/etc
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
       - HF_HOME=/home/appuser/.cache/huggingface
@@ -23,6 +23,8 @@ services:
     volumes:
        # Mount code for live development
        - ./code:/app/code
+       # Mount .env file for live environment variable changes
+       - ./.env:/app/.env
        # Mount cache directories
        - huggingface_cache:/home/appuser/.cache/huggingface
        - torch_cache:/home/appuser/.cache/torch
