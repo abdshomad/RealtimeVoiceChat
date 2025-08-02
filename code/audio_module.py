@@ -16,6 +16,13 @@ from RealtimeTTS import (CoquiEngine, KokoroEngine, OrpheusEngine,
 
 logger = logging.getLogger(__name__)
 
+# Apply Coqui compatibility patch
+try:
+    from coqui_patch import *
+    logger.info("✅ Coqui compatibility patch applied successfully")
+except ImportError as e:
+    logger.warning(f"⚠️ Could not apply Coqui patch: {e}")
+
 # Default configuration constants
 START_ENGINE = "kokoro"
 Silence = namedtuple("Silence", ("comma", "sentence", "default"))
