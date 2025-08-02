@@ -36,8 +36,7 @@ def create_directory(path: str) -> None:
     Args:
         path: The directory path to create.
     """
-    if not os.path.exists(path):
-        os.makedirs(path)
+    os.makedirs(path, exist_ok=True)
 
 def ensure_lasinya_models(models_root: str = "models", model_name: str = "Lasinya") -> None:
     """
@@ -103,7 +102,7 @@ class AudioProcessor:
 
         # Dynamically load and configure the selected TTS engine
         if engine == "coqui":
-            ensure_lasinya_models(models_root="models", model_name="Lasinya")
+            ensure_lasinya_models(models_root="/app/code/models", model_name="Lasinya")
             self.engine = CoquiEngine(
                 specific_model="Lasinya",
                 local_models_path="./models",

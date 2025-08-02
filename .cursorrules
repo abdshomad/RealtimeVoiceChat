@@ -1,0 +1,65 @@
+# Cursor Rules for RealtimeVoiceChat Docker Compose Development
+
+## Development Environment Setup
+- Always run the application using Docker Compose
+- Use `.env` file for environment variables (especially PORT)
+- Mount current directory to Docker container for live code changes
+- No need to rebuild Docker when code changes
+
+## Docker Compose Configuration
+- Use `docker-compose up` to start the application
+- Use `docker-compose down` to stop the application
+- Use `docker-compose logs -f` to view logs
+- Use `docker-compose restart` to restart services
+
+## Environment Variables
+- Load PORT from `.env` file
+- Mount current directory to `/app` in container
+- Enable hot reloading for development
+
+## File Structure
+- `.env` - Environment variables (PORT, etc.)
+- `docker-compose.yml` - Docker Compose configuration
+- `Dockerfile` - Container definition
+- Volume mount: `.:/app` for live code changes
+
+## Development Workflow
+1. Make code changes in the current directory
+2. Changes are automatically reflected in the running container
+3. No need to rebuild Docker image for code changes
+4. Use `docker-compose restart` only for environment variable changes
+
+## Commands to Remember
+```bash
+# Start the application
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop the application
+docker-compose down
+
+# Restart services
+docker-compose restart
+
+# Rebuild and start (only needed for Dockerfile changes)
+docker-compose up --build
+```
+
+## Documentation Management
+- Always update `./docs/INSTALL.md` with the latest installation steps
+- Keep installation instructions synchronized with current Docker Compose setup
+- Document any new environment variables or configuration changes
+- Include troubleshooting steps for common issues
+- **ALWAYS update `./docs/TROUBLESHOOT.md` after resolving any errors or issues**
+- Document error symptoms, root cause, and resolution steps in troubleshooting guide
+- Keep troubleshooting documentation synchronized with current codebase and Docker setup
+
+## Best Practices
+- Always check `.env` file exists and has required variables
+- Use volume mounts for development, not for production
+- Keep Docker Compose configuration in version control
+- Use `.dockerignore` to exclude unnecessary files from build context
+- Maintain up-to-date documentation in `./docs/INSTALL.md`
+- **Create and maintain comprehensive troubleshooting guide in `./docs/TROUBLESHOOT.md`** 

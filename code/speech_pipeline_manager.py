@@ -169,7 +169,11 @@ class SpeechPipelineManager:
         )
         self.llm.prewarm()
         self.llm_inference_time = self.llm.measure_inference_time()
-        logger.debug(f"🗣️🧠🕒 LLM inference time: {self.llm_inference_time:.2f}ms")
+        if self.llm_inference_time is not None:
+            logger.debug(f"🗣️🧠🕒 LLM inference time: {self.llm_inference_time:.2f}ms")
+        else:
+            logger.warning("🗣️🧠🕒 LLM inference time measurement failed, using default value")
+            self.llm_inference_time = 1000.0  # Default to 1 second if measurement fails
 
         # --- State ---
         self.history = []
