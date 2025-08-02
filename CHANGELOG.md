@@ -8,6 +8,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Enhanced Logging System**: Comprehensive logging with dual output (console and file)
+  - Automatic log file creation in `./logs/` directory with timestamped filenames
+  - Different log levels for console (INFO) and file (DEBUG) output
+  - Colored console output with custom time formatting
+  - Detailed file logging with source file and line information
+- **Log Analysis Tools**: 
+  - `log_viewer.py`: View, filter, and analyze log files
+  - `log_cleanup.py`: Manage log file retention and cleanup
+  - Support for real-time log following, level filtering, and statistics
+- **Log Management Features**:
+  - Automatic logs directory creation
+  - Configurable log retention policies
+  - Log file statistics and analysis
+  - Error handling for logging setup failures
 - Environment variable support for HOST and PORT configuration
 - Graceful fallback from KokoroEngine to CoquiEngine when KokoroEngine is unavailable
 - Dotenv integration for .env file loading
@@ -19,7 +33,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Project status update reflecting community-driven development model
 
 ### Changed
-- Updated README.md to reflect community-driven development status
+- Enhanced `logsetup.py` with dual output logging and improved error handling
+- Updated `server.py` to use enhanced logging with file output
+- Modified `run_server.sh` to ensure logs directory exists
+- Updated README.md to reflect community-driven development status and include logging documentation
 - Improved error handling in audio_module.py for missing TTS engines
 - Enhanced server.py configuration to use environment variables
 - Migrated from pip to uv for package management

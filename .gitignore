@@ -407,4 +407,8 @@ downloads/
 .Spotlight-V100
 .Trashes
 ehthumbs.db
-Thumbs.db 
+Thumbs.db
+
+# Log files
+logs/
+*.log 

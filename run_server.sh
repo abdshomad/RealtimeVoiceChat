@@ -58,12 +58,17 @@ fi
 export PORT=${PORT:-9000}
 export HOST=${HOST:-0.0.0.0}
 
+# Ensure logs directory exists
+mkdir -p logs
+echo "📁 Logs directory ready: ./logs/"
+
 # Navigate to code directory
 cd code
 
 # Start the server
 echo "Starting RealTimeVoiceChat server..."
 echo "Access the application at: http://localhost:${PORT}"
+echo "📁 Server logs will be saved to: ../logs/"
 echo "Press Ctrl+C to stop the server"
 echo ""
 

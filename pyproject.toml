@@ -42,7 +42,7 @@ requires-python = ">=3.10,<3.12"
 dependencies = [
     # Core AI/ML Libraries
     "realtimestt @ git+https://github.com/koljaB/RealtimeSTT.git",
-    "realtimetts @ git+https://github.com/koljaB/RealtimeTTS.git",
+    "realtimetts[kokoro] @ git+https://github.com/koljaB/RealtimeTTS.git",
     "gtts>=2.5.0",
     "parler-tts>=0.2.0",
     "edge-tts>=7.0.0",
@@ -73,6 +73,7 @@ dependencies = [
     "torch>=2.1.0",
     "torchaudio>=2.1.0",
     "torchvision>=0.16.0",
+    "pip>=25.2",
 ]
 
 [project.optional-dependencies]

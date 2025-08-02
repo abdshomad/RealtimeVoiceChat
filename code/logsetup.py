@@ -1,5 +1,7 @@
 import logging
 import time
+import os
+from datetime import datetime
 from colors import Colors # Assuming 'colors' library is installed (pip install ansicolors) or your custom Colors class
 from typing import Optional # Added for type hint consistency if needed elsewhere, though not strictly used in current args/returns
 
@@ -35,55 +37,126 @@ class CustomTimeFormatter(logging.Formatter):
         s = time.strftime("%M:%S", now) + f".{cs:02d}"
         return s
 
-def setup_logging(level: int = logging.INFO) -> None:
+class FileTimeFormatter(logging.Formatter):
     """
-    Configures the root logger for console output with a custom format and level.
+    A logging Formatter for file output with full timestamps.
+    """
+    
+    def formatTime(self, record: logging.LogRecord, datefmt: Optional[str] = None) -> str:
+        """
+        Formats the log record's creation time into full datetime format.
+        """
+        now = time.localtime(record.created)
+        return time.strftime("%Y-%m-%d %H:%M:%S", now)
 
-    Sets up a `StreamHandler` for the root logger if no handlers are already present.
-    Applies a `CustomTimeFormatter` to display timestamps as MM:SS.cs and uses
-    ANSI colors for different log message parts (timestamp, logger name, level, message).
-    This setup avoids modifying global logging state like the record factory or
-    the global Formatter converter.
+def setup_logging(level: int = logging.INFO, enable_file_logging: bool = True, 
+                  file_level: int = logging.DEBUG, console_level: int = logging.INFO) -> None:
+    """
+    Configures the root logger for console and file output with custom formats and levels.
+
+    Sets up a `StreamHandler` for console output and a `FileHandler` for file output
+    if file logging is enabled. Applies custom formatters for both handlers.
+    Creates logs directory if it doesn't exist and generates timestamped log files.
+    Allows different log levels for console and file output.
 
     Args:
-        level: The minimum logging level for the root logger and the console handler
+        level: The minimum logging level for the root logger
                (e.g., `logging.DEBUG`, `logging.INFO`). Defaults to `logging.INFO`.
+        enable_file_logging: Whether to enable file logging. Defaults to True.
+        file_level: The minimum logging level for file output. Defaults to `logging.DEBUG`.
+        console_level: The minimum logging level for console output. Defaults to `logging.INFO`.
     """
     # Check if the root logger already has handlers to avoid adding them multiple times
     root_logger = logging.getLogger()
     if not root_logger.hasHandlers():
         # Set the level on the logger itself
-        root_logger.setLevel(level)
+        root_logger.setLevel(min(level, file_level, console_level))
 
-        # --- Define Format String ---
-        # Note: We will use the standard '%(asctime)s' placeholder now,
-        # because our CustomTimeFormatter will format it correctly.
+        # --- Console Handler Setup ---
+        # Define Format String for console
         prefix = Colors.apply("🖥️").gray
-        # Use the standard %(asctime)s - our custom formatter will handle its appearance
         timestamp = Colors.apply("%(asctime)s").blue
         levelname = Colors.apply("%(levelname)-4.4s").green.bold
         message = Colors.apply("%(message)s")
         logger_name = Colors.apply("%(name)-10.10s").gray
 
-        log_format = f"{timestamp} {logger_name} {levelname} {message}"
-        # --- Format String Defined ---
+        console_format = f"{timestamp} {logger_name} {levelname} {message}"
+        
+        # Create console formatter and handler
+        console_formatter = CustomTimeFormatter(console_format)
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(console_formatter)
+        console_handler.setLevel(console_level)
+        root_logger.addHandler(console_handler)
 
-        # --- Configure logging using explicit Handler/Formatter ---
-        # Avoids basicConfig and global state modification
+        # --- File Handler Setup ---
+        if enable_file_logging:
+            try:
+                # Ensure logs directory exists
+                logs_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "logs")
+                os.makedirs(logs_dir, exist_ok=True)
+                
+                # Generate timestamped log filename
+                timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+                log_filename = f"server_{timestamp_str}.log"
+                log_filepath = os.path.join(logs_dir, log_filename)
+                
+                # Define format string for file (without colors, with more detail)
+                file_format = "%(asctime)s %(name)-15.15s %(levelname)-8.8s %(filename)s:%(lineno)d - %(message)s"
+                
+                # Create file formatter and handler
+                file_formatter = FileTimeFormatter(file_format)
+                file_handler = logging.FileHandler(log_filepath, encoding='utf-8')
+                file_handler.setFormatter(file_formatter)
+                file_handler.setLevel(file_level)
+                root_logger.addHandler(file_handler)
+                
+                # Log the file logging setup
+                root_logger.info(f"📁 File logging enabled: {log_filepath}")
+                root_logger.debug(f"📁 File log level: {logging.getLevelName(file_level)}")
+                root_logger.debug(f"🖥️ Console log level: {logging.getLevelName(console_level)}")
+                
+            except Exception as e:
+                # If file logging fails, log the error to console only
+                root_logger.warning(f"⚠️ Failed to setup file logging: {e}")
+                root_logger.warning("⚠️ Continuing with console logging only")
 
-        # 1. Create the custom formatter instance
-        # We pass the desired log format string. datefmt is not needed as formatTime is overridden.
-        formatter = CustomTimeFormatter(log_format)
+def get_log_file_path() -> str:
+    """
+    Returns the path to the current log file.
+    
+    Returns:
+        The path to the current log file, or empty string if file logging is not enabled.
+    """
+    root_logger = logging.getLogger()
+    for handler in root_logger.handlers:
+        if isinstance(handler, logging.FileHandler):
+            return handler.baseFilename
+    return ""
 
-        # 2. Create a handler (e.g., StreamHandler to log to console)
-        handler = logging.StreamHandler()
-
-        # 3. Set the custom formatter on the handler
-        handler.setFormatter(formatter)
-
-        # 4. Set the level *on the handler* (optional but good practice,
-        #    basicConfig does this implicitly). Controls messages processed by this handler.
-        handler.setLevel(level)
-
-        # 5. Add the configured handler to the root logger
-        root_logger.addHandler(handler)
+def get_log_stats() -> dict:
+    """
+    Returns statistics about the current logging setup.
+    
+    Returns:
+        A dictionary with logging statistics including file path, log levels, etc.
+    """
+    root_logger = logging.getLogger()
+    stats = {
+        "file_path": get_log_file_path(),
+        "handlers_count": len(root_logger.handlers),
+        "logger_level": logging.getLevelName(root_logger.level),
+        "handlers": []
+    }
+    
+    for i, handler in enumerate(root_logger.handlers):
+        handler_info = {
+            "index": i,
+            "type": type(handler).__name__,
+            "level": logging.getLevelName(handler.level)
+        }
+        if isinstance(handler, logging.FileHandler):
+            handler_info["file_path"] = handler.baseFilename
+        stats["handlers"].append(handler_info)
+    
+    return stats

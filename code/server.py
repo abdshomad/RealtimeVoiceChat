@@ -1,11 +1,18 @@
 # server.py
 from queue import Queue, Empty
 import logging
-from logsetup import setup_logging
-setup_logging(logging.INFO)
+from logsetup import setup_logging, get_log_file_path, get_log_stats
+# Setup logging with WARNING level for file, WARNING for console to reduce verbosity
+setup_logging(logging.WARNING, enable_file_logging=True, file_level=logging.WARNING, console_level=logging.WARNING)
 logger = logging.getLogger(__name__)
 if __name__ == "__main__":
     logger.info("🖥️👋 Welcome to local real-time voice chat")
+    log_file = get_log_file_path()
+    if log_file:
+        logger.info(f"📁 Server logs will be saved to: {log_file}")
+        # Log additional debug info
+        log_stats = get_log_stats()
+        logger.debug(f"📊 Logging setup: {log_stats['handlers_count']} handlers, logger level: {log_stats['logger_level']}")
 
 from upsample_overlap import UpsampleOverlap
 from datetime import datetime
@@ -28,9 +35,11 @@ from fastapi.staticfiles import StaticFiles
 from starlette.responses import HTMLResponse, Response, FileResponse
 
 USE_SSL = False
-TTS_START_ENGINE = "orpheus"
-# TTS_START_ENGINE = "kokoro"
+# Enable TTS with mock engine to avoid complex dependencies
+TTS_START_ENGINE = "mock"
 # TTS_START_ENGINE = "coqui"
+# TTS_START_ENGINE = "orpheus"
+# TTS_START_ENGINE = "kokoro"
 TTS_ORPHEUS_MODEL = "Orpheus_3B-1BaseGGUF/mOrpheus_3B-1Base_Q4_K_M.gguf"
 TTS_ORPHEUS_MODEL = "orpheus-3b-0.1-ft-Q8_0-GGUF/orpheus-3b-0.1-ft-q8_0.gguf"
 
@@ -43,7 +52,8 @@ NO_THINK = False
 DIRECT_STREAM = TTS_START_ENGINE=="orpheus"
 
 if __name__ == "__main__":
-    logger.info(f"🖥️⚙️ {Colors.apply('[PARAM]').blue} Starting engine: {Colors.apply(TTS_START_ENGINE).blue}")
+    engine_display = str(TTS_START_ENGINE) if TTS_START_ENGINE else "DISABLED"
+    logger.info(f"🖥️⚙️ {Colors.apply('[PARAM]').blue} Starting engine: {Colors.apply(engine_display).blue}")
     logger.info(f"🖥️⚙️ {Colors.apply('[PARAM]').blue} Direct streaming: {Colors.apply('ON' if DIRECT_STREAM else 'OFF').blue}")
 
 # Define the maximum allowed size for the incoming audio queue

@@ -37,6 +37,7 @@ A sophisticated client-server system built for low-latency interaction:
 *   **Customizable Voices:** Choose from different Text-to-Speech engines (Kokoro, Coqui, Orpheus via `audio_module.py`).
 *   **Web Interface:** Clean and simple UI using Vanilla JS and the Web Audio API.
 *   **Dockerized Deployment:** Recommended setup using Docker Compose for easier dependency management.
+*   **Enhanced Logging:** Comprehensive logging system with file and console output, log analysis tools, and cleanup utilities.
 
 ## Technology Stack 🛠️
 
@@ -242,6 +243,46 @@ Want to tweak the AI's voice, brain, or how it listens? Modify the Python files 
     5.  Generate certs (replace `your.local.ip`): `mkcert localhost 127.0.0.1 ::1 your.local.ip`
         *   This creates `.pem` files (e.g., `localhost+3.pem` and `localhost+3-key.pem`) in the current directory. Update `SSL_CERT_PATH` and `SSL_KEY_PATH` in `server.py` accordingly. Remember to potentially mount these into your Docker container.
     </details>
+
+---
+
+## Logging and Monitoring 📊
+
+The application includes a comprehensive logging system to help with debugging and monitoring:
+
+### Log Files
+- Logs are automatically saved to the `./logs/` directory
+- Each server start creates a new timestamped log file
+- Both console and file logging are supported
+
+### Log Analysis Tools
+```bash
+# View available log files
+cd code && python log_viewer.py --list
+
+# Show recent log entries
+python log_viewer.py --tail 50
+
+# Filter by log level (ERROR, WARNING, INFO, DEBUG)
+python log_viewer.py --level ERROR
+
+# Search for specific terms
+python log_viewer.py --search "websocket"
+
+# Show log statistics
+python log_viewer.py --stats
+
+# Clean up old log files (older than 7 days)
+python log_cleanup.py --days 7
+```
+
+### Log Levels
+- **DEBUG**: Detailed debugging information (file only)
+- **INFO**: General server operations
+- **WARNING**: Potential issues
+- **ERROR**: Problems requiring attention
+
+For detailed logging documentation, see [docs/LOGGING.md](docs/LOGGING.md).
 
 ---
 
