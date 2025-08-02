@@ -1,0 +1,66 @@
+# Cursor Rules for RealtimeVoiceChat Project
+
+## Package Management
+- Always use `uv` for Python package management instead of pip
+- Use `.venv` virtual environment for all Python operations
+- Install dependencies with: `uv sync` or `uv add <package>`
+
+## Development Environment
+- Use `.venv` as the Python interpreter for this project
+- Activate virtual environment: `source .venv/bin/activate`
+- Use `uv` for all package operations: `uv add`, `uv remove`, `uv sync`
+
+## Running the Application
+- Always use `run_server.sh` to start the application
+- Do not use `python server.py` directly
+- The script handles environment setup and proper execution
+
+## Code Style and Standards
+- Follow PEP 8 for Python code
+- Use type hints where appropriate
+- Keep functions focused and well-documented
+- Use meaningful variable and function names
+
+## File Organization
+- Keep code in the `code/` directory
+- Static files in `code/static/`
+- Configuration files in root directory
+- Use relative imports within the project
+
+## Git Workflow
+- Use descriptive commit messages
+- Create feature branches for new functionality
+- Test changes before committing
+- Keep commits focused and atomic
+
+## Docker Development
+- Use Docker Compose for containerized development
+- Build with: `docker compose build`
+- Run with: `docker compose up -d`
+- Check logs with: `docker compose logs -f`
+
+## Performance Considerations
+- Optimize for low-latency audio processing
+- Use GPU acceleration when available
+- Monitor memory usage for large models
+- Profile performance bottlenecks
+
+## Error Handling
+- Implement proper error handling for audio processing
+- Log errors appropriately
+- Graceful degradation when services are unavailable
+- User-friendly error messages
+
+## Security
+- Never commit API keys or sensitive data
+- Use environment variables for configuration
+- Validate user inputs
+- Follow security best practices for web applications
+
+## Documentation Maintenance
+- Always update `docs/PRD.md` after implementing new features to reflect current product requirements
+- Update `docs/TODO.md` after completing tasks by marking them as done and adding new tasks as needed
+- Create and maintain `CHANGELOG.md` to track all changes, improvements, and bug fixes
+- Update documentation immediately after successful feature implementation
+- Keep documentation synchronized with code changes
+- Include version numbers and dates in documentation updates 

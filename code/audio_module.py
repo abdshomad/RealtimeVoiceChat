@@ -11,8 +11,16 @@ from typing import Callable, Generator, Optional
 import numpy as np
 from huggingface_hub import hf_hub_download
 # Assuming RealtimeTTS is installed and available
-from RealtimeTTS import (CoquiEngine, KokoroEngine, OrpheusEngine,
+from RealtimeTTS import (CoquiEngine, OrpheusEngine,
                          OrpheusVoice, TextToAudioStream)
+
+# Try to import KokoroEngine (optional)
+try:
+    from RealtimeTTS import KokoroEngine
+    KOKORO_AVAILABLE = True
+except ImportError:
+    KOKORO_AVAILABLE = False
+    # logger not available at module level, will log later when needed
 
 logger = logging.getLogger(__name__)
 
@@ -119,16 +127,35 @@ class AudioProcessor:
                 add_sentence_filter=True,
             )
         elif engine == "kokoro":
-            self.engine = KokoroEngine(
-                voice="af_heart",
-                default_speed=1.26,
-                trim_silence=True,
-                silence_threshold=0.01,
-                extra_start_ms=25,
-                extra_end_ms=15,
-                fade_in_ms=15,
-                fade_out_ms=10,
-            )
+            if not KOKORO_AVAILABLE:
+                logger.warning("KokoroEngine not available, falling back to CoquiEngine")
+                engine = "coqui"
+                self.engine_name = "coqui"
+                self.silence = ENGINE_SILENCES["coqui"]
+                ensure_lasinya_models(models_root="models", model_name="Lasinya")
+                self.engine = CoquiEngine(
+                    specific_model="Lasinya",
+                    local_models_path="./models",
+                    use_deepspeed=True,
+                    thread_count=6,
+                    stream_chunk_size=self.current_stream_chunk_size,
+                    overlap_wav_len=1024,
+                    load_balancing=True,
+                    load_balancing_buffer_length=0.5,
+                    load_balancing_cut_off=0.1,
+                    add_sentence_filter=True,
+                )
+            else:
+                self.engine = KokoroEngine(
+                    voice="af_heart",
+                    default_speed=1.26,
+                    trim_silence=True,
+                    silence_threshold=0.01,
+                    extra_start_ms=25,
+                    extra_end_ms=15,
+                    fade_in_ms=15,
+                    fade_out_ms=10,
+                )
         elif engine == "orpheus":
             self.engine = OrpheusEngine(
                 model=self.orpheus_model,

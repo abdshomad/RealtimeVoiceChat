@@ -29,8 +29,8 @@ from starlette.responses import HTMLResponse, Response, FileResponse
 
 USE_SSL = False
 TTS_START_ENGINE = "orpheus"
-TTS_START_ENGINE = "kokoro"
-TTS_START_ENGINE = "coqui"
+# TTS_START_ENGINE = "kokoro"
+# TTS_START_ENGINE = "coqui"
 TTS_ORPHEUS_MODEL = "Orpheus_3B-1BaseGGUF/mOrpheus_3B-1Base_Q4_K_M.gguf"
 TTS_ORPHEUS_MODEL = "orpheus-3b-0.1-ft-Q8_0-GGUF/orpheus-3b-0.1-ft-q8_0.gguf"
 
@@ -940,11 +940,24 @@ async def websocket_endpoint(ws: WebSocket):
 # Entry point
 # --------------------------------------------------------------------
 if __name__ == "__main__":
+    # Load configuration from environment variables
+    import os
+    from dotenv import load_dotenv
+    
+    # Load .env file if it exists
+    load_dotenv()
+    
+    # Get server configuration from environment variables
+    HOST = os.getenv("HOST", "0.0.0.0")
+    PORT = int(os.getenv("PORT", "9000"))
+    
+    logger.info(f"🖥️⚙️ {Colors.apply('[CONFIG]').blue} Server host: {Colors.apply(HOST).blue}")
+    logger.info(f"🖥️⚙️ {Colors.apply('[CONFIG]').blue} Server port: {Colors.apply(str(PORT)).blue}")
 
     # Run the server without SSL
     if not USE_SSL:
         logger.info("🖥️▶️ Starting server without SSL.")
-        uvicorn.run("server:app", host="0.0.0.0", port=8000, log_config=None)
+        uvicorn.run("server:app", host=HOST, port=PORT, log_config=None)
 
     else:
         logger.info("🖥️🔒 Attempting to start server with SSL.")
@@ -964,8 +977,8 @@ if __name__ == "__main__":
         logger.info(f"🖥️▶️ Starting server with SSL (cert: {cert_file}, key: {key_file}).")
         uvicorn.run(
             "server:app",
-            host="0.0.0.0",
-            port=8000,
+            host=HOST,
+            port=PORT,
             log_config=None,
             ssl_certfile=cert_file,
             ssl_keyfile=key_file,
